@@ -1,0 +1,33 @@
+---
+title: "Project_3"
+author: "Jieran Sun"
+date: '2023-03-14'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Problem 1
+
+### a)
+For this given model, we have L states and K symbols. For the state, the system requires $K$ initial state probability and $K \times K$ transition probability to define the system. As both initial probability and individual transitional probability starting from one state needs to be summed up as 1, the number of free parameters at this stages is $K-1 + K \times (K-1)$.
+
+For the emission probability, $E_{kx}$ should be defined for each pair of symbol and state, and for each state the total sum of the emission probabilty should be 1. Hence the total number of free variable in terms of emission probability is $K\times(M-1)$. 
+
+Hence in the end the system can be defined by $K^2 -1 + K(M-1)$. 
+
+### b)
+
+Since in HMM model the markov chain is ergodic, the stationary distribution $ \pi $ then satistfy $ \pi^T = \pi^T T$. Solving the equation, we have $ \pi^T = [\frac{3}{7}, \frac{4}{7}]$. 
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
