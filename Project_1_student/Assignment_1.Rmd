@@ -1,0 +1,166 @@
+---
+title: "Assignment_1"
+author: "Jieran Sun, Hui Jeong (HJ) Jung, Gumdmundur Björgvin Magnusson"
+date: "2023-02-27"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+suppressPackageStartupMessages({
+  library(BiDAG)
+  library(GGally)
+  library(dplyr)
+  library(magrittr)
+  # BiocManager::install("graph")
+  # BiocManager::install("RBGL")
+  # BiocManager::install("Rgraphviz")
+  # This pacakage requires so many dependencies
+})
+```
+
+## Question 1
+
+For the network models a) and b), case a) holds the statement of $A \perp B \vert C$, whereas b) holds the statement of $A \perp B$.
+
+For case a):
+
+```{=tex}
+\begin{align}
+  P(A, B \ | \ C ) &= \frac{P(A,B,C)}{P(C)} \\
+  &= \frac{P(A \ | \ C) P(B \ | \ C) P(C)}{P(C)} \\
+  &= P(A \ | \ C) P(B \ | \ C)
+\end{align}
+```
+Hence the conditional independence.
+
+For case b):
+
+```{=tex}
+\begin{align}
+  P(C \ | \ A, B ) &= \frac{P(A,B,C)}{P(A,B)} \\
+  &= \frac{P(C \ | \ A, B) P(B) P(A)}{P(A,B)} 
+\end{align}
+```
+Moving the denominator to the left, we end up with the equality
+
+```{=tex}
+\begin{align}
+  P(A,B) = P(A)P(B)
+\end{align}
+```
+## Question 2
+
+Markov blanket $MB(D)$ is the set of nodes composed of the parents, co-parents and children of $D$. In this case, $MB(D) = \{ B, F, C, G, E \}$. Given that
+
+```{=tex}
+\begin{align}
+  P(D \ | \ MB(D),A ) &= \frac{P(D, MB(D),A )}{P(A,MB(D))} \\
+  &= \frac{P(A \ | \ D, MB(D)) P(D, MB(D))}{P(A \ | \ MB(D)) P(MB(D))}
+\end{align}
+```
+Because A is independent to $D$ and $MB(D)$, we can simplify the expression $P(A|D,MB(D))$ to $P(A)$.
+
+```{=tex}
+\begin{align}
+  \frac{P(A) P(D, MB(D))}{P(A) P(MB(D))}
+  &= \frac{P(D, MB(D))}{P(MB(D))} \\
+  &= P(D \ | \ MB(D))
+\end{align}
+```
+## Question 3
+
+### a
+
+```{r load and sample data}
+data <- read.csv("https://raw.githubusercontent.com/felixleopoldo/benchpress/master/resources/data/mydatasets/2005_sachs_2_cd3cd28icam2_log_std.csv", )
+```
+
+The number of observations N is equal to 902, the number of variables n is equal to 11.
+
+```{r data visualization}
+GGally::ggpairs(data)
+```
+
+```{r split data into train and test}
+set.seed(2023)
+ind <- sample(1:nrow(data), as.integer(0.8*nrow(data)), replace = FALSE) 
+train_data <- data[ind,]
+test_data <- data[-ind,]
+```
+
+```{r initialize parameters?}
+init_param <- BiDAG::scoreparameters(scoretype= "bge", data= train_data)
+```
+
+### b
+
+```{r iterative MCMC}
+library(igraph)
+mcmc <- iterativeMCMC(init_param)
+adj <- getDAG(mcmc)
+
+ig <- graph_from_adjacency_matrix(adj, mode= "directed")
+plot.igraph(ig)
+```
+
+### c
+
+To compare over different am values, we learned the DAG 100 times for each am values and obtained the average number of edges that the different DAGs had for 100 different datasets, as well as the average sum of the log scores and the average mean of the log scores.
+
+```{r comparing am values}
+set.seed(2023)
+# use when utilizing mclapply
+RNGkind("L'Ecuyer-CMRG")
+
+# different am values to compare which performs best 
+am <- c(10^-3, 10^-1, 1, 10, 10^2)
+
+results <- parallel::mclapply(am, mc.cores= 5, function(am_index){
+    sum <- 0
+    mean <- 0
+    edge <- 0
+    iter <- 100
+  
+    for (c in 1:iter) {
+      ind <- sample(1:nrow(data), as.integer(0.8*nrow(data)), replace = FALSE) 
+      train_data_c <- data[ind,]
+      test_data_c <- data[-ind,]
+      
+      scorepar_train <- scoreparameters(scoretype= "bge", data= train_data_c, 
+                    bgepar= list(am= am_index))
+      mcmc_train <- iterativeMCMC(scorepar_train)
+      
+      num_edges <- sum(mcmc_train$DAG)
+      log_score <- scoreagainstDAG(scorepar= scorepar_train, incidence= mcmc_train$DAG, 
+                       datatoscore= test_data_c)
+      sum <- sum + sum(log_score)
+      mean <- mean + mean(log_score)
+      edge <- edge + num_edges
+    }
+    log_score_sum  <- sum / iter
+    log_score_mean <- mean / iter
+    num_edges <- edge / iter
+
+    c(num_edges, log_score_sum, log_score_mean)
+ 
+}) %>% as.data.frame() %>% set_colnames(am) %>% 
+  set_rownames(c('Avg Number of Edges', 'Avg Sum of Log Scores', 'Avg Mean of Log Scores'))
+
+knitr::kable(results)
+
+```
+
+From the above analysis, we can assume that the best am value is 1. Based on that we generated the optimal DAG
+
+```{r generating optimal DAG}
+final_param <- BiDAG::scoreparameters(scoretype= "bge", data= data)
+mcmc_final <- iterativeMCMC(final_param)
+adj_final <- getDAG(mcmc_final)
+
+ig_final <- graph_from_adjacency_matrix(adj_final, mode= "directed")
+plot.igraph(ig)
+
+```

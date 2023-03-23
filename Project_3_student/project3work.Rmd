@@ -1,0 +1,417 @@
+---
+title: "Assignment 3"
+author: "Jieran Sun, Hui Jeong (HJ) Jung, Gudmundur Björgvin Magnusson"
+output: pdf_document
+date: "2023-03-13"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Problem 6
+
+### a) The number of parameters that define a model depends on the number of number of hidden states = K as well as the number of possible emitted values = M.
+
+
+$DoF = K * (K-1) + K * (M-1) + K - 1 = K * ((K-1) + (M-1) + 1) - 1$
+
+
+### (b) We can calculate the stationary distribution according to the ergodicity theorem which states that the stationary distribution $\pi$ is the solution of $\pi^t = \pi^t*T$. This can be done be finding the leading eigen vector and setting its magnitude to 1. Alternitively, for a small matrix like this we can solve the induced system of equitions directly: 
+
+```{=tex}
+$$\begin{pmatrix}x1&x2\end{pmatrix} * 
+\begin{pmatrix}0.2&0.8\\0.6&0.4 \end{pmatrix} = \begin{pmatrix}x1&x2\end{pmatrix}
+$$
+```
+This can be simplified to below. 
+```{=tex}
+\begin{align}
+  x1 * 0.2 + x2 * 0.6 = x1 \\
+  x1 * 0.8 + x2 * 0.4 = x2 \\
+  x1 + x2 = 1
+\end{align}
+```
+Thus this gives us the results $x1 = 0.428571 = \frac{3}{7}$ and $x2= 0.571429 = \frac{4}{7}$. Thus $\pi = \begin{pmatrix} \frac{3}{7} & \frac{4}{7} \end{pmatrix}$
+
+
+## Problem 7
+
+
+### a)
+Read the data into memory
+
+```{r}
+suppressPackageStartupMessages(library(dplyr))
+
+setwd("C:/Users/zoidp/OneDrive/ETH/StatisticalModelsInComputationalBiology/Project_3_student/")
+
+# Load stuff
+source("code/viterbi.r")
+
+data_new <- data.table::fread("data/proteins_new.tsv",data.table = FALSE,header = FALSE)
+data_test <- data.table::fread("data/proteins_test.tsv",data.table = FALSE,header = FALSE)
+data_train <- data.table::fread("data/proteins_train.tsv",data.table = FALSE,header = FALSE)
+
+# Function for converting string to array
+str2array <- function(.) stringr::str_split(., "")[[1]]
+
+
+unique.ss <- c("B", "C", "E", "G", "H", "I", "S", "T")
+  unique.aa <- c("A", "C", "D", "E", "F", "G", "H", "I",
+                 "K", "L", "M", "N", "P", "Q", "R", "S",
+                 "T", "U", "V", "W", "X", "Y")
+
+```
+
+### b) 
+Here we set up self contained functions that take a data and a set of indices and compute I, T and E arrays. These functions are made to work with boot package for the later sections.
+
+#### Function for computing inital state probabilities
+
+```{r}
+
+Comp_I <- function(data, indices) {
+  
+  unique.ss <- c("B", "C", "E", "G", "H", "I", "S", "T")
+  
+  temp <- as.data.frame(data$V3[indices])
+  counts  <- apply(temp,1,
+                   FUN = function(x) substr(x,start=1,stop=1)) %>%
+    table()
+  
+    a <- counts[unique.ss] # Order vector
+    a[is.na(a)] <- 0       # Fix 0
+  
+    I_vec <- as.vector(a/sum(a))
+    
+ return(I_vec)
+}
+
+# Compute I from training data
+
+I_vec <- Comp_I(data_train,1:nrow(data_train))
+I_vec
+```
+
+### Function for computing Transition probabilities
+
+```{r}
+
+Comp_T <- function(data, indices) {
+  str2array <- function(.) stringr::str_split(., "")[[1]]
+  unique.ss <- c("B", "C", "E", "G", "H", "I", "S", "T")
+
+  T_mat <- matrix(0,length(unique.ss),length(unique.ss))
+  
+  # Count occurrences of transition 
+  
+  for (seq in data$V3[indices]) {
+    arr <- str2array(seq)
+    for (i in 1:(length(arr)-1) ) {
+     k <- which(arr[i] == unique.ss) 
+     l <- which(arr[i+1] == unique.ss)
+     T_mat[k,l] <- T_mat[k,l] + 1
+    }
+  }
+  
+  # Divide each element by its row-wise sum to get probabilities 
+  
+  T_mat <- t(apply(T_mat,1, function(x) x/(sum(x)))) 
+  
+
+return(T_mat)
+}
+
+# Compute T from training data
+
+T_mat <- Comp_T(data_train,1:800)
+
+# Plot Heatmap of transition probs
+rownames(T_mat) <- unique.ss
+colnames(T_mat) <- unique.ss
+pheatmap::pheatmap(T_mat,cluster_rows = F,cluster_cols = F)
+
+```
+
+### Function for computing Emission Probabilities
+
+```{r}
+
+Comp_E <- function(data, indices) {
+
+  str2array <- function(.) stringr::str_split(., "")[[1]]
+  unique.ss <- c("B", "C", "E", "G", "H", "I", "S", "T")
+  unique.aa <- c("A", "C", "D", "E", "F", "G", "H", "I",
+                 "K", "L", "M", "N", "P", "Q", "R", "S",
+                 "T", "U", "V", "W", "X", "Y")
+  
+  E_mat <- matrix(0,length(unique.ss),length(unique.aa))
+  
+  for (i in indices) {
+    aa <- str2array(data[i,2])
+    ss <- str2array(data[i,3])
+
+    for (j in 1:length(aa) ) {
+     k <- which(ss[j] == unique.ss) 
+     x <- which(aa[j] == unique.aa)
+     E_mat[k,x] <- E_mat[k,x] + 1
+    }
+  }
+  
+  E_mat <- t(apply(E_mat,1, function(x) x/sum(x)))
+  return(E_mat)
+}
+
+# Compute E from training data
+
+E_mat <- Comp_E(data_train,1:800)
+
+# Plot Emission probabilities 
+
+rownames(E_mat) <- unique.ss
+colnames(E_mat) <- unique.aa
+pheatmap::pheatmap(E_mat,cluster_rows = F,cluster_cols = F)
+```
+
+
+### c) 
+Here we estimate stationary distribution three different ways. First we compute the leading eigen vector and divide each element by its sum. We were not entirely sure what was meant by brute-force in the second part, so we tried both exponentiating the transistion matrix n times and extracting a row from it as well as simply simulating the markov chain for 500 000 iterations and computing the distribtuion of states. All methods gave fairly similar estimations.
+
+```{r}
+# Eigen Value approach
+
+eigs  <- eigen(t(T_mat))
+
+pi <- eigs$vectors[,1]/sum(eigs$vectors[,1])
+
+###### BRUTE FORCE 1 : T to the power of n ###### 
+
+n = 10
+
+pi_brute <- T_mat
+
+for (i in 1:n) {
+  pi_brute <- pi_brute %*% pi_brute
+}
+
+pi2 <- pi_brute[1,]
+
+
+###### BRUTE FORCE 2 : SIMULATION ###########
+
+num.iters = 500000
+states_Z     <- numeric(num.iters)
+states_X     <- numeric(num.iters)
+
+# Start chain 
+states_Z[1]  <- which(rmultinom(1, 1, I_vec) == 1)
+states_X[1]  <- which(rmultinom(1, 1, E_mat[states_Z[1],] ) == 1)
+
+# Simulate num.iters steps
+
+for(t in 2:num.iters) {
+  
+  # probability vector to simulate next state 
+  p_z  <- T_mat[states_Z[t-1], ]
+  p_x  <- E_mat[states_Z[t-1], ]
+  
+  ## draw from multinomial and determine states
+  states_Z[t] <-  which(rmultinom(1, 1, p_z) == 1)
+  states_X[t] <-  which(rmultinom(1, 1, p_x) == 1)
+}
+
+# Eigen-solving
+pi
+
+# Exponentiation
+pi2
+
+# MC simulation (for emitted as well)
+table(states_Z)/sum(table(states_Z))
+
+table(states_X)/sum(table(states_X))
+
+
+```
+
+### d) 
+Here we take the logs of our parameters and feed them into the viterbi function to generate predictions.
+
+```{r}
+
+E <- log(E_mat)
+Tr <- log(T_mat)
+I <- log(I_vec)
+
+colnames(data_train)[2] <- "AminoAcids"
+colnames(data_test)[2] <- "AminoAcids"
+colnames(data_new)[2] <- "AminoAcids"
+
+test_pred <- viterbi(E=E,Tr=Tr,I=I,p=data_test) 
+new_pred  <- viterbi(E=E,Tr=Tr,I=I,p=data_new) 
+
+write.table(new_pred,"proteins_new.tsv",row.names = F,col.names = F)
+
+```
+
+### e) 
+We use the boot package and our previously defined functions to do boot strapping and confidence interval (percentilce method) estimation.
+
+```{r,warning=FALSE}
+
+## I
+
+I_bs<- boot::boot(data = data_train,statistic = Comp_I,R = 1000)
+
+I_conf <- c()
+
+## boot::boot.ci does not like that all values are 1 for H
+
+# for (i in 1:8) {
+#   temp <- boot::boot.ci(I_bs,index = i,type = "perc")
+#   I_conf[i] <- paste0(signif(temp$percent[,4:5],3),collapse = "-")
+# }
+
+I_conf <- c("0-0","1-1","0-0","0-0","0-0","0-0","0-0","0-0")
+
+## T
+
+T_bs<- boot::boot(data = data_train,statistic = Comp_T,R = 1000,
+                  parallel = "snow",ncpus = 6)
+
+T_bs$t[is.nan(T_bs$t)] <- 0 # fix weird NaNs
+
+T_conf <- c()
+for (i in 1:64) {
+  temp <- boot::boot.ci(T_bs,index = i,type = "perc")
+  T_conf[i] <- paste0(signif(temp$percent[,4:5],3),collapse = "-")
+}
+
+T_conf <- matrix(T_conf,
+                 nrow = nrow(T_mat),
+                 ncol = ncol(T_mat),
+                 dimnames = list(unique.ss,unique.ss))
+
+## E
+
+E_bs<- boot::boot(data = data_train,statistic = Comp_E,R = 1000,
+                  parallel = "snow",ncpus = 6)
+
+E_conf <- c()
+for (i in 1:(dim(E_mat)[1]*dim(E_mat)[2])) {
+  temp <- boot::boot.ci(E_bs,index = i,type = "perc")
+  E_conf[i] <- paste0(signif(temp$percent[,4:5],3),collapse = "-")
+}
+
+E_conf <- matrix(E_conf,
+                 nrow = nrow(E_mat),
+                 ncol = ncol(E_mat),
+                 dimnames = list(unique.ss,unique.aa))
+
+# Report Confidence intervals for I
+I_conf
+
+# Report Confidence intervals for T
+T_conf
+
+# Report Confidence intervals for E
+E_conf
+
+```
+
+
+
+### f) 
+Here we compute and report the accuracy of the viterbi derived, predicted sequences. It is not very good.
+
+```{r}
+computeAcc <- function(data) {
+  acc <- numeric(nrow(data))
+  for (i in 1:nrow(data)) {
+    ss_t <- str2array(data[i,3])
+    ss_p <- str2array(data[i,4])
+    acc[i] <- sum(ss_t == ss_p)/length(ss_t)
+  }
+  data$Accuracy <- acc
+  return(data)
+}
+
+test_pred_acc <- computeAcc(test_pred)
+
+summary(test_pred_acc$Accuracy)
+
+```
+
+## g) 
+Here we generate random secondary structure sequences of the appropriate length for each sequence in both our test and training set and and compute the accuracy. Alongside generating strings with uniform distribution of SS symbols we also tried generating strings that have the same distribution of symbols as is in the the data set. The viterbi derived predictions are markedly better then random guessing, but not substantially better then distribution informed random strings.
+
+
+```{r}
+
+# Compute the distribution of ss symbols in data.
+
+temp <- c(data_train$V3,data_test$V3) %>%
+paste0(collapse = "") %>%
+  str2array() %>%
+  table()
+
+ss_dist <- as.vector(temp[unique.ss]/sum(temp))
+
+# Define function for generating ss symbols according to some probability vector 
+randomPreds <- function(data,probs) {
+  RandPreds <- c()
+  for (i in 1:nrow(data)) {
+      n = nchar(data$V3[i])
+      RandPreds[i] <- paste0(sample(unique.ss,
+                                    size = n,
+                                    replace = T,
+                                    prob = probs),collapse="")
+  }
+  data$RandPreds <- RandPreds
+  return(data)
+}
+
+rand_preds_uniform <- randomPreds(rbind(data_test,data_train),NULL)
+rand_preds_dist    <- randomPreds(rbind(data_test,data_train),ss_dist)
+
+rand_pred_uniform_acc <- computeAcc(rand_preds_uniform)
+rand_pred_dist_acc    <- computeAcc(rand_preds_dist)
+
+# Accuracy Summary Statistics for Uniform Random Guessing
+summary(rand_pred_uniform_acc$Accuracy)
+
+# Accuracy Summary Statistics for training set 
+# distribution Informed Random Guessing
+
+summary(rand_pred_dist_acc$Accuracy)
+
+
+```
+
+```{r}
+suppressPackageStartupMessages(library(ggplot2))
+
+# Gather accuracy scores in a single dataframe
+
+acc_data <- data.frame(HMM=test_pred_acc$Accuracy,
+           UnifRand=rand_pred_uniform_acc$Accuracy,
+           DistRand=rand_pred_dist_acc$Accuracy
+           )
+
+# Plot the the accuracy of the 3 different methods
+
+ ggplot(acc_data, aes(x = factor("Viterbi HMM"), y = HMM)) + 
+    geom_boxplot() + 
+    geom_boxplot(aes(x = factor("Uniform Random Guessing"), 
+                     y = UnifRand), 
+                     fill = "red") + 
+  geom_boxplot(aes(x = factor("Distribution informed \n
+                               Random Guessing"),
+                   y = DistRand), fill = "blue") + 
+    theme_bw() + 
+    theme(axis.title.x = element_blank()) + 
+    ylab("Accuracy")
+
+```
+
