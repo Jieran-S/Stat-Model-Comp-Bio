@@ -1,6 +1,6 @@
 ---
-title: "Assignment_3"
-author: "Jieran Sun, Hui Jeong (HJ) Jung, Gumdmundur Björgvin Magnusson"
+title: "Assignment 4"
+author: "Jieran Sun, Hui Jeong (HJ) Jung, Gudmundur Björgvin Magnusson"
 output: pdf_document
 date: "2023-03-22"
 ---
@@ -13,27 +13,62 @@ library(knitr)
 ```
 ## Question 8
 
+Here we simply perform a pseudocount of the emitted symbol for all match states. 
+We then compute the probabilities.
+
 ```{r}
 A <- c(5/8, 1/8, 6/9)
 C <- c(1/8, 1/8, 1/9)
 G <- c(1/8, 5/8, 1/9)
 T <- c(1/8, 1/8, 1/9)
-answer <- matrix(c(A,C,G,T), nrow= 4, ncol= 3)
-kable(answer, caption= "Match emission probabilities")
+
+answer <- matrix(c(A,C,G,T),
+                 nrow= 4,
+                 ncol= 3,
+                 dimnames = list(c("A","C","G","T"),
+                                 c("1","2","3")))
+                 
+                 
+kable(answer,
+      caption= "Match emission probabilities",
+      digits = 3)
 ```
 
 ## Question 9
 
+Here we simply perform a pseudocount of the emitted symbol for all insertions states.
+We only observe emissions from insertion state 2.
+We note that we could also include the zeroth insert state, as per our graphical model, which would have the same probabilities as 1 and 3.
 
+
+```{r}
+a<- c(1/4, 6/10, 1/4)
+b <- c(1/4, 1/10, 1/4)
+c <- c(1/4, 2/10, 1/4)
+g <- c(1/4, 1/10, 1/4)
+
+answer <- (matrix(c(a,b,c,g),
+                 nrow= 3,
+                 ncol= 4,
+                 dimnames = list(c("State 1","State 2","State 3"),
+                                 c("A","C","G","T"))))
+                 
+                 
+kable(answer,
+      caption= "Insert state emission probabilities",
+      digits = 3)
+```
 
 ## Question 10 
 
+Here we simply perform a pseudocount of the observed state transitions and compute probabilities.
 
-
+![State Transistion Probabilites](Question10.png){width=50%}
 
 ## Question 11
 ### 1
-```{r cars}
+```{r }
+
 # load the source code 
 source("code/profileHMM.R")
 ```
