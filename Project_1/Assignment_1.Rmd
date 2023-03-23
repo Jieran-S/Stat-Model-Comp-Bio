@@ -1,0 +1,168 @@
+---
+title: "Assignment_1"
+author: "Jieran Sun, HJ, Gummi"
+date: '2023-02-27'
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+suppressPackageStartupMessages({
+  library(BiDAG)
+  library(GGally)
+  library(igraph)
+  library(dplyr)
+  library(magrittr)
+  library(foreach)
+  library(parallel)
+  library(doParallel)
+  # BiocManager::install("graph")
+  # BiocManager::install("RBGL")
+  # BiocManager::install("Rgraphviz")
+  # This pacakage requires so many dependencies
+})
+```
+
+## Question 1
+
+For the network models a) and b), case a) holds the statement of $A \perp B \ \vert \ C$, whereas b) holds the statement of $A \perp B$.
+
+For case a):
+
+```{=tex}
+\begin{align}
+  P(A, B \ | \ C ) &= \frac{P(A,B,C)}{P(C)} \\
+  &= \frac{P(A \ | \ C) P(B \ | \ C) P(C)}{P(C)} \\
+  &= P(A \ | \ C) P(B \ | \ C)
+\end{align}
+```
+Hence the conditional independence.
+
+For case b):
+
+```{=tex}
+\begin{align}
+  P(C \ | \ A, B ) &= \frac{P(A,B,C)}{P(A,B)} \\
+  &= \frac{P(C \ | \ A, B) P(B) P(A)}{P(A,B)} \\
+  p(A,B) = P(A) P(B)
+\end{align}
+```
+## Question 2
+
+Markov blanket $MB(D)$ is the set of nodes composed of the parents, co-parents and children of $D$. In this case, $MB(D) = \{ B, F, C, G, E \}$. Given that
+
+```{=tex}
+\begin{align}
+  P(D \ | \ MB(D),A ) &= \frac{P(D, MB(D),A )}{P(A,MB(D))} \\
+  &= \frac{P(A \ | \ D, MB(D)) P(D, MB(D))}{P(A \ | \ MB(D)) P(MB(D))} \\
+  &= \frac{P(A) P(D, MB(D))}{P(A) P(MB(D))} \\
+  &= \frac{P(D, MB(D))}{P(MB(D))} \\
+  &= P(D \ | \ MB(D))
+\end{align}
+```
+## Question 3
+
+### a)
+
+```{r data loading and sampling}
+data <- read.csv("https://raw.githubusercontent.com/felixleopoldo/benchpress/master/resources/data/mydatasets/2005_sachs_2_cd3cd28icam2_log_std.csv", )
+
+set.seed(2023)
+ind <- sample(1:nrow(data), as.integer(0.8*nrow(data)), replace = FALSE) 
+train_data <- data[ind,]
+test_data <- data[-ind,]
+
+cat(sprintf("Number of variables n: %s, the number of observations N: %s.", ncol(data), nrow(data)))
+```
+
+```{r data visualization}
+ggpairs(data) + theme_bw()
+```
+
+```{r parameter initialization}
+Para_init <- BiDAG::scoreparameters(scoretype = "bge",
+                                    train_data)
+```
+
+```{r train and plot the data}
+Bayes_network <- BiDAG::iterativeMCMC(scorepar = Para_init)
+dag_bayes <- Bayes_network$CPDAG %>% graph_from_adjacency_matrix(mode = "directed")
+plot(dag_bayes)
+```
+
+```{r test data network evaluation}
+eval_bayes <- BiDAG::scoreagainstDAG(scorepar = Para_init, 
+                                     incidence = getDAG(Bayes_network),
+                                     datatoscore = test_data)
+cat(sprintf("The average score is %.3f", mean(eval_bayes)))
+```
+
+```{r training dataset, eval = FALSE}
+amtuning <- function(am_v){
+  # Reproducibility
+  set.seed(2023)
+  
+  log_score_sum <- 0
+  edge_sum <- 0
+  
+  for (i in 1:100){
+    
+    # Split the data
+    ind <- sample(1:nrow(data), as.integer(0.8*nrow(data)), replace = FALSE) 
+    train_data <- data[ind,]
+    test_data <- data[-ind,]
+    
+    # Initialize the parameters
+    Para_init <- BiDAG::scoreparameters(scoretype = "bge",
+                                        bgepar = list(am = am_v, aw = NULL, edgepf = 1),
+                                        train_data)
+    
+    # Network construction
+    Bayes_network <- BiDAG::iterativeMCMC(scorepar = Para_init)
+    eval_mean <- mean(BiDAG::scoreagainstDAG(scorepar = Para_init, incidence = getDAG(Bayes_network),
+                                       datatoscore = test_data))
+    edge_mean <- sum(getDAG(Bayes_network))
+    log_score_sum <- log_score_sum + eval_mean
+    edge_sum <- edge_sum + edge_mean
+  }
+  c(score = log_score_sum/100, edge = edge_sum/100)
+}
+
+am_list <- c(1e-3, 1e-1, 1, 10, 1e2)
+
+registerDoParallel(5)  
+results_df <- foreach (am = am_list, .combine=rbind) %dopar% {
+  amtuning(am)
+}
+stopImplicitCluster()
+```
+
+```{r results}
+am_list <- c(1e-3, 1e-1, 1, 10, 1e2)
+results_df <- readRDS("results.rds")
+results_df_prez <- as.data.frame(results_df, row.names = as.character(am_list))
+knitr::kable(results_df_prez)
+```
+
+The final average log score is taken through the average of the test dataset.
+
+```{r best AM}
+OptAM <- am_list[which.max(results_df[,"score"])]
+cat(sprintf("The am value corrresponding to the highest score is %s", OptAM))
+```
+
+```{r plot DAG of the best graph}
+set.seed(2023)
+# build the final product parameter
+Para_final <- BiDAG::scoreparameters(scoretype = "bge",
+                                      bgepar = list(am = OptAM, aw = NULL, edgepf = 1),
+                                      data = data)
+  
+# build the network
+Bayes_network_final <- BiDAG::iterativeMCMC(scorepar = Para_final)
+
+# Plot the DAG
+Bayes_network_final$DAG %>% graph_from_adjacency_matrix(mode = "directed") %>% igraph::plot.igraph()
+```
