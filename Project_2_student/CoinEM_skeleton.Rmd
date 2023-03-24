@@ -8,11 +8,6 @@ In this problem, you will implement the EM algorithm for the coin toss problem i
 Below we provide you with a skeleton of the algorithm. You can either fill this skeleton with the required functions or write your own version of the EM algorithm. If you choose to do the latter, please also present your results using Rmarkdown in a clear fashion.
 
 ```{r}
-suppressPackageStartupMessages({
-  library(data.table)
-  library(pheatmap)
-  library(viridis)
-})
 set.seed(2023)
 ```
 
@@ -22,7 +17,7 @@ We first read the data stored in the file "coinflip.csv".
 
 ```{r}
 # read the data into D
-D <- read.csv("coinflip.csv")
+D <- ## YOUR CODE ##
 # check the dimension of D
 all(dim(D) == c(200, 100))
 ```
@@ -35,9 +30,9 @@ Next, we will need to initialize the mixture weights and the probabilities of ob
 # Number of coins
 k <- 2
 # Mixture weights (a vector of length k)
-lambda <- c(0.5, 0.5)
+lambda <- ## YOUR CODE ##
 # Probabilities of obtaining heads (a vector of length k)
-theta <- runif(2)
+theta <- ## YOUR CODE ##
 ```
 
 ## (c) The EM algorithm
@@ -75,33 +70,12 @@ coin_EM <- function(D, k, lambda, theta, tolerance = 1e-2) {
     ### YOUR CODE STARTS ###
     
     # Compute the responsibilities
-    # Define the probability of data given theta
-    prob_x_theta <- rbind(theta[1] ** (rowSums(D == 1)) + (1 - theta[1]) ** (rowSums(D==0)),
-                          theta[2] ** (rowSums(D == 1)) + (1 - theta[2]) ** (rowSums(D==0)))
-    
-    # Find the respective responsibility vector
-    lambda_prob_prod <- data.table(rbind(lambda[1] * prob_x_theta[1,], 
-                                         lambda[2] * prob_x_theta[2,]))
-    gamma <- lambda_prob_prod[, lapply(.SD, function(x) x/sum(x))]
-    
-    PofXgivenTheta <- gamma
-    for (i in 1:nrow(D)) {
-      for (k_i in 1:k) {
-          PofXgivenTheta[k_i,i] <- prod(D[i,] * theta[k_i] + (D[i,]-1) * (theta[k_i]-1))*lambda[k_i]
-      }
-    }
-    
-    gamma <- apply(PofXgivenTheta, 2, function(x) x/sum(x))
     
     # Update expected complete-data (hidden) log-likelihood
-    # For binary cases the log likelihood is also following the same 
-    ll_hid <- sum(gamma * log(lambda_prob_prod))
     
     # Update observed log-likelihood
-    ll_obs <- ll_hid
-    ll_obs <- sum(log(apply(PofXgivenTheta, 2, sum)))
+    
     # Recompute difference between two iterations
-    diff <- ll_obs - ll_obs_old
     
     ### YOUR CODE ENDS ###
     
@@ -110,11 +84,8 @@ coin_EM <- function(D, k, lambda, theta, tolerance = 1e-2) {
     ### YOUR CODE STARTS ###
     
     # Recompute priors (mixture weights)
-    lambda <- rowMeans(gamma)
     
     # Recompute probability of heads for each coin
-    theta <- c(sum(gamma[1,] * rowSums(D == 1))/(100*sum(gamma[1,])),
-               sum(gamma[2,] * rowSums(D == 1))/(100*sum(gamma[2,]))) 
     
     ### YOUR CODE ENDS ###
     
@@ -138,36 +109,22 @@ Probability of heads:
 
 ```{r}
 ## YOUR CODE ##
-cat(sprintf(
-  "The probability of heads are: 
-  coin 1: %.3f
-  coin 2: %.3f", 
-  res$theta[1], res$theta[2]))
 ```
 
 Mixture weights:
 
 ```{r}
 ## YOUR CODE ##
-cat(sprintf(
-  "The mixture weights are:
-  coin 1 : %.3f 
-  coin 2 : %.3f ", 
-  res$lambda[1], res$lambda[2]
-))
 ```
 
 Heatmap of responsibilities:
 
 ```{r}
 ## YOUR CODE ##
-pheatmap::pheatmap(res$gamma, color = viridis_pal(option = "D")(100)) 
 ```
 
 How many observations belong to each coin?
 
 ```{r}
 ## YOUR CODE ##
-cat("The number of observation for each coin is predicted below: \n")
-knitr::kable(table(as.numeric(res$gamma[, lapply(.SD, which.max)])))
 ```
