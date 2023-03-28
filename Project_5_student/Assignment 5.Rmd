@@ -1,0 +1,56 @@
+---
+title: "Assignment 5"
+author: "Jieran Sun, Hui Jeong (HJ) Jung, Gudmundur Björgvin Magnusson"
+output: pdf_document
+date: "2023-03-28"
+---
+
+## Question 12
+
+### (1)
+```{=tex}
+\begin{align}
+  P(t + dt) = P(dt)P(t) = (I + Rdt)P(t)
+\end{align}
+```
+Therefore we can show that 
+```{=tex}
+\begin{align}
+  \frac{dP(t)}{dt} = RP(t)
+\end{align}
+```
+## Question 13
+
+### (1) The joint probability of the tree is 
+```{=tex}
+\begin{align}
+  P(X,Z|T) = P(Z_4) * P(X_5|Z_4) * P(Z_3|Z_4) * P(Z_2|Z_3) * P(Z_1|Z_3) \\
+  * P(X_4|Z_2) * P(X_3|Z_2) * P(X_2|Z_1) * P(X_1|Z_1)
+\end{align}
+```
+
+### (2) To do the naive calculation of P(X|T) via brute-force marginalization over the hidden nodes Z, 
+for each node X, we have to marginalize out all the internal nodes Z that it is dependent on. 
+Here is an example with X4. 
+```{=tex}
+\begin{align}
+  P(X_4|T) = \sum_Z P(X_4, Z|T) = \sum_Z P(X_4|Z_2)P(Z_2|Z_3)P(Z_3|Z_4)P(Z_4)\\
+  = \sum_Z P(X_4, Z_2, Z_3, Z_4)
+\end{align}
+```
+Thus for X4, we would have to sum over 3 times. For X1, X2, X3, and X4 they all depend on 3 Zs so they also have to sum 3 times. 
+X5 only depends on Z4, therefore only has to sum once. In total the brute force method would require 13 summations.  
+
+### (3)
+```{=tex}
+\begin{align}
+  P(X,Z|T) = P(Z_4) * P(X_5|Z_4) * P(Z_3|Z_4) * P(Z_2|Z_3) * P(Z_1|Z_3) \\
+  * P(X_4|Z_2) * P(X_3|Z_2) * P(X_2|Z_1) * P(X_1|Z_1)
+\end{align}
+```
+By rearranging the expression in such way we only need to do 4 summations. 
+
+## Question 14
+
+
+
