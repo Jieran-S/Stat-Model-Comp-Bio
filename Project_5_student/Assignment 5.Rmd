@@ -19,9 +19,14 @@ Therefore we can show that
   \frac{dP(t)}{dt} = RP(t)
 \end{align}
 ```
+
+### (2)
+## TODO 
+
 ## Question 13
 
 ### (1) The joint probability of the tree is 
+## TODO : not sure what the "long version" is supposed to be, bc the one below is the "simple" one 
 ```{=tex}
 \begin{align}
   P(X,Z|T) = P(Z_4) * P(X_5|Z_4) * P(Z_3|Z_4) * P(Z_2|Z_3) * P(Z_1|Z_3) \\
@@ -52,5 +57,61 @@ By rearranging the expression in such way we only need to do 4 summations.
 
 ## Question 14
 
+### (1)
+```{r setup}
+if(!require("phangorn")) {
+  install.packages("phangorn")
+}
+if(!require("ape")) {
+  install.packages("ape")
+}
 
+library(phangorn)
+library(ape)
+```
 
+```{r load data}
+ParisRT <- read.dna("ParisRT.txt")
+```
+
+### (2)
+```{r initial tree}
+distParis <- dist.dna(ParisRT)
+initTree <- NJ(distParis)
+plot(initTree)
+```
+### (3)
+```{r fit Kimura}
+kimura <- pml(tree= initTree, data= phyDat(ParisRT), model= "K80")
+kimura$logLik
+```
+The log likelihood of the fitted model is -3003.487. 
+
+### (4)
+The values of the optimised rate matrix can be found below. 
+```{r optimise parameters}
+optimParam <- optim.pml(kimura, optQ= TRUE)
+optimParam
+```
+### (5)
+After optimizing with respect to branch lengths, nucleotide substitution rates, and tree topology, 
+the results are as below. 
+```{r optimise more parameters}
+optimParam2 <- optim.pml(kimura, optQ = TRUE, optNni = TRUE, optEdge = TRUE)
+optimParam2$logLik
+```
+The log likelihood is -2849.789.
+
+### (6)
+```{r bootstrap, results ='hide'}
+bootPML <- bootstrap.pml(optimParam2, optNni= TRUE)
+```
+In this bootstrapping function, we are resampling the sequences that we are using to construct
+a phylogenetic tree, and seeing if the same branch is observed even when generating a new tree
+based on bootstrapped data, which would indicate confidence in the observed branch. 
+
+### (7)
+```{r plot tree}
+plotBS(tree= optimParam2$tree, BStrees = bootPML, type= "phylogram")
+```
+Judging from this plot, it is more likely that Mme_S was more likely to have infected the patient Mme_L. 
