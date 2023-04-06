@@ -54,9 +54,12 @@ $$
 $$
 and for the other, we similarly have:
 
-$$
-P(C|\neg R,S,W) = \frac{P(C)*P(S|C)*P(\neg R|C)}{P(C)*P(S|C)*P(\neg R|C) + P(\neg C)*P(S|\neg C)*P(\neg R|\neg C)} = \frac{0.5*0.1*0.2}{0.5*0.1*0.2+0.5*0.5*0.8} = 0.04761905
-$$
+```{=tex}
+\begin{align}
+P(C|\neg R,S,W) &= \frac{P(C)*P(S|C)*P(\neg R|C)}{P(C)*P(S|C)*P(\neg R|C) + P(\neg C)*P(S|\neg C)*P(\neg R|\neg C)} \\ 
+&= \frac{0.5*0.1*0.2}{0.5*0.1*0.2+0.5*0.5*0.8} = 0.04761905
+\end{align}
+```
 For Rain conditional probilities:
 
 $$
