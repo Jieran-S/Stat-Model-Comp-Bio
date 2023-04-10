@@ -8,56 +8,71 @@ date: "2023-03-28"
 ## Question 12
 
 ### (1)
+
 ```{=tex}
 \begin{align}
   P(t + dt) = P(dt)P(t) = (I + Rdt)P(t)
 \end{align}
 ```
-Therefore we can show that 
+Therefore we can show that
+
 ```{=tex}
 \begin{align}
   \frac{dP(t)}{dt} = RP(t)
 \end{align}
 ```
-
 ### (2)
-## TODO 
+
+As the Markov chain is homogeneous Markov chain and $\pi$ is the ergodic stationary distribution,
+
+```{=tex}
+\begin{align}
+  t \rightarrow \infty \ \  P(t) \pi &= \pi     \\
+  \text{multiply $R$,} \ \ R P(t) \pi &= R \pi  \\
+  \frac{dP(t)}{dt} \pi &= R \pi \\
+\end{align}
+```
+Given that when $t \rightarrow \infty$, $P(t)$ reach steady state, $\frac{dP(t)}{dt} = 0$. Hence $R \pi = 0$.
 
 ## Question 13
 
-### (1) The joint probability of the tree is 
-## TODO : not sure what the "long version" is supposed to be, bc the one below is the "simple" one 
+### (1) The joint probability of the tree is
+
 ```{=tex}
 \begin{align}
   P(X,Z|T) = P(Z_4) * P(X_5|Z_4) * P(Z_3|Z_4) * P(Z_2|Z_3) * P(Z_1|Z_3) \\
   * P(X_4|Z_2) * P(X_3|Z_2) * P(X_2|Z_1) * P(X_1|Z_1)
 \end{align}
 ```
+### (2) To do the naive calculation of P(X\|T) via brute-force marginalization over the hidden nodes Z,
 
-### (2) To do the naive calculation of P(X|T) via brute-force marginalization over the hidden nodes Z, 
-for each node X, we have to marginalize out all the internal nodes Z that it is dependent on. 
-Here is an example with X4. 
+for each node X, we have to marginalize out all the internal nodes Z that it is dependent on. Here is an example with X4.
+
 ```{=tex}
 \begin{align}
-  P(X_4|T) = \sum_Z P(X_4, Z|T) = \sum_Z P(X_4|Z_2)P(Z_2|Z_3)P(Z_3|Z_4)P(Z_4)\\
-  = \sum_Z P(X_4, Z_2, Z_3, Z_4)
+  P(X_4|T) &= \sum_Z P(X_4, Z|T) = \sum_{Z_2, Z_3, Z_4} P(X_4|Z_2)P(Z_2|Z_3)P(Z_3|Z_4)P(Z_4)\\
 \end{align}
 ```
-Thus for X4, we would have to sum over 3 times. For X1, X2, X3, and X4 they all depend on 3 Zs so they also have to sum 3 times. 
-X5 only depends on Z4, therefore only has to sum once. In total the brute force method would require 13 summations.  
+Given each Z represent a nucleitode and can take 4 values(A,T,G,C), then the total number of cases for $X_4$ is $4^3 = 64$. Hence 64 summation operations are needed for X4.
+
+Similarly, for $X_1, X_2, X_3$, they all have 64 cases and 64 summation operations, and for $X_5$ we have 4 summation cases as $P(X_5, Z) = \sum_{Z_4} P(X_5 | Z_4)P(Z_4)$ and it only has 4 cases.
+
+Hence in total the number of summation operation is $64 \times 4 + 4 = 260$.
 
 ### (3)
+
 ```{=tex}
 \begin{align}
   P(X,Z|T) = P(Z_4) * P(X_5|Z_4) * P(Z_3|Z_4) * P(Z_2|Z_3) * P(Z_1|Z_3) \\
   * P(X_4|Z_2) * P(X_3|Z_2) * P(X_2|Z_1) * P(X_1|Z_1)
 \end{align}
 ```
-By rearranging the expression in such way we only need to do 4 summations. 
+By rearranging the expression in such way we only need to do 4 summations.
 
 ## Question 14
 
 ### (1)
+
 ```{r setup}
 if(!require("phangorn")) {
   install.packages("phangorn")
@@ -75,43 +90,54 @@ ParisRT <- read.dna("ParisRT.txt")
 ```
 
 ### (2)
+
 ```{r initial tree}
 distParis <- dist.dna(ParisRT)
 initTree <- NJ(distParis)
 plot(initTree)
 ```
+
 ### (3)
+
 ```{r fit Kimura}
 kimura <- pml(tree= initTree, data= phyDat(ParisRT), model= "K80")
 kimura$logLik
 ```
-The log likelihood of the fitted model is -3003.487. 
+
+The log likelihood of the fitted model is -3003.487.
 
 ### (4)
-The values of the optimised rate matrix can be found below. 
+
+The values of the optimised rate matrix can be found below.
+
 ```{r optimise parameters}
 optimParam <- optim.pml(kimura, optQ= TRUE)
 optimParam
 ```
+
 ### (5)
-After optimizing with respect to branch lengths, nucleotide substitution rates, and tree topology, 
-the results are as below. 
+
+After optimizing with respect to branch lengths, nucleotide substitution rates, and tree topology, the results are as below.
+
 ```{r optimise more parameters}
 optimParam2 <- optim.pml(kimura, optQ = TRUE, optNni = TRUE, optEdge = TRUE)
 optimParam2$logLik
 ```
+
 The log likelihood is -2849.789.
 
 ### (6)
+
 ```{r bootstrap, results ='hide'}
 bootPML <- bootstrap.pml(optimParam2, optNni= TRUE)
 ```
-In this bootstrapping function, we are resampling the sequences that we are using to construct
-a phylogenetic tree, and seeing if the same branch is observed even when generating a new tree
-based on bootstrapped data, which would indicate confidence in the observed branch. 
+
+In this bootstrapping function, we are resampling the sequences that we are using to construct a phylogenetic tree, and seeing if the same branch is observed even when generating a new tree based on bootstrapped data, which would indicate confidence in the observed branch.
 
 ### (7)
+
 ```{r plot tree}
 plotBS(tree= optimParam2$tree, BStrees = bootPML, type= "phylogram")
 ```
-Judging from this plot, it is more likely that Mme_S was more likely to have infected the patient Mme_L. 
+
+Judging from this plot, it is more likely that Mme_S was more likely to have infected the patient Mme_L.
