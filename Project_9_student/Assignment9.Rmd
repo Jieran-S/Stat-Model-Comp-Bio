@@ -1,0 +1,116 @@
+---
+title: "Assignment 9"
+output: pdf_document
+date: "2023-04-29"
+author: Hui Jeong (HJ) Jung, Gudmundur Björgvin Magnusson, Jieran Sun
+---
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(pcalg)
+library(BiDAG)
+library(igraph)
+library(pheatmap)
+```
+
+## Problem 24 Testing for marignal correlation 
+
+First we load the data and examine the data structure.
+```{r load data }
+nvmData <- readRDS("MVN_DAG.rds")
+head(nvmData)
+```
+
+Plot the scatter plot for the observation A and B
+```{r scatter plots}
+ggplot(nvmData, aes(x = A, y = B)) + geom_point() +
+  ggtitle("Scatter plot between observation A and B")
+```
+
+It can be inferred from the scatter plot that the correlation between observation A and B are merely nonexistent, A and B are not correlated with each other. This observation from the scatter plot also agree with what we have observed on the DAG graph where A and B are independent of each other. 
+
+Now we test the independence hypothesis using `cor.test()`
+
+```{r cortest marginal correlation}
+cor.test(nvmData$A, nvmData$B)
+```
+
+Since the p value is way larger than 0.05, we accept the null hypothesis and confirm that A and B are independent from each other.
+
+## 25 partial correlation
+
+First, we find the residual of A and B by fitting them into a linear regression on C
+```{r finding residual}
+Ares <- residuals(lm(A ~ C, data = nvmData)) 
+Bres <- residuals(lm(B ~ C, data = nvmData)) 
+```
+
+Then similarly we plot the residual relationship
+
+```{r scatter plot residuals}
+ggplot() + geom_point(aes(x = Ares, y = Bres)) +
+  ggtitle("residual relationship between A and B")
+```
+Comparing to the results shown in question 24, this plots show us a stronger correlation between the residual of A and B observations, indicating that A and B are not conditionally independent given C.
+
+Now let's test the null hypothesis that A and B are conditionally independent given C.
+```{r partial correlation test}
+cor.test(Ares, Bres)
+```
+
+Given that p value is way smaller than 0.05, we reject the null hypothesis and state that A and B are not conditionally independent given C. This result also agree with what we observed from Figure 2.
+
+## 26 run PC algorithm 
+
+Given the instruction, we run the pc function and plot the resulting DAG
+```{r run the pc algorithm}
+statList <- list(C = cor(nvmData), n = nrow(nvmData))
+
+pcResults <- pc(suffStat = statList, 
+                indepTest = gaussCItest, 
+                alpha = 0.9,
+                labels = colnames(nvmData))
+
+iplotPC(pcResults)
+```
+## 27 partition MCMC algorithm
+
+First we set up the score and run the MCMC algorithm
+```{r set up the s}
+# initialize the parameters 
+score <- scoreparameters("bge", nvmData)
+
+# run iterative MCMC algorithm
+maxBNalpha05 <- learnBN(score, algorithm = "orderIter", alpha = 0.05)
+# plot the maxBN DAG results
+plot.igraph(graph_from_adjacency_matrix(maxBNalpha05$CPDAG, mode= "directed"),
+            main = "alpha = 0.05")
+
+# set alpha to 0.1
+maxBNalpha10 <- learnBN(score, algorithm = "orderIter", alpha = 0.1)
+# plot the maxBN DAG results
+plot.igraph(graph_from_adjacency_matrix(maxBNalpha10$CPDAG, mode= "directed"), 
+            main = "alpha = 0.1")
+
+# set alpha to 0.2
+maxBNalpha50 <- learnBN(score, algorithm = "orderIter", alpha = 0.5)
+# plot the maxBN DAG results
+plot.igraph(graph_from_adjacency_matrix(maxBNalpha50$CPDAG, mode= "directed"), 
+            main = "alpha = 0.5")
+```
+From the list of graphs above we can see the hyperparameter alpha does not affect the final DAG connectivity and shape.
+
+Then we run the MCMC partition algorithm, extract the marginal probability for the edges and plot them into a heatmap
+```{r partition MCMC algorithm}
+partitionSample <- sampleBN(score, 
+                            algorithm = "partition",
+                            startspace = maxBNalpha05$endspace)
+
+# compute the marginal posterior probabilities
+edgesPosterior <- edgep(partitionSample, pdag = TRUE)
+
+# plot the heatmap 
+pheatmap(edgesPosterior)
+```
+
+
