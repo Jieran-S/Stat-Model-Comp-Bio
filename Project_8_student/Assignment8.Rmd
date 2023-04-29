@@ -1,0 +1,129 @@
+---
+title: "Assignment 7"
+output: pdf_document
+date: "2023-04-08"
+author: Hui Jeong (HJ) Jung, Gudmundur Björgvin Magnusson, Jieran Sun
+---
+
+```{r setup, include=FALSE}
+library(mnem)
+library(dplyr)
+library(data.table)
+library(ggplot2)
+```
+
+## Problem 21 Hidden Markov NEMs
+
+1. Implement Hidden markov model in the transitional probability between the graphs. 
+
+```{r set up the function for HM-NEMs algorithm}
+adjMatU <- matrix(c(1,1,1,0,
+                    0,1,1,1,
+                    0,0,1,1,
+                    0,0,0,1),
+                  nrow = 4, byrow = TRUE)
+
+adjV1 <- matrix(c(1,1,1,0,
+                  0,1,1,1,
+                  0,0,1,0,
+                  0,0,0,1),
+                nrow = 4, byrow = TRUE)
+
+adjV2 <- matrix(c(1,0,0,0,
+                  1,1,1,0,
+                  1,0,1,0,
+                  1,0,0,1),
+                nrow = 4, byrow = TRUE)
+
+endAdj <- list(adjV1, adjV2)
+
+transitionProb <- function(startAdj, endAdjs, lambda){
+  transProb <- sapply(endAdjs, function(endAdj){
+    Suv <- sum(abs(endAdj - startAdj))
+    Tuv <- lambda * ((1 - lambda)^Suv)
+  })
+  transPorb <- transProb/sum(transProb)
+  
+  return(transPorb)
+}
+
+transProb <- lapply(seq(0.1, 0.9, by = 0.1), function(lambda){
+  transitionProb(startAdj = adjMatU, endAdjs = endAdj, lambda = lambda)
+}) %>% as.data.frame() %>% t() %>% as.data.table()
+
+transProb[, lambda := seq(0.1, 0.9, by = 0.1)]
+
+```
+
+```{r print out the results}
+knitr::kable(transProb)
+```
+
+2. Plot out the results
+
+```{r plot out the results}
+ggplot(data = transProb) + 
+  geom_line(aes(x = lambda, y = V1, col = "V1")) + 
+  geom_line(aes(x = lambda, y = V2, col = "V2"))
+```
+
+## Problem 22 
+
+1. Given the circumstances, the perturbation map rho
+
+```{r print out the perturbation map}
+
+rho <- matrix(c(1,0,1,0,
+                0,1,1,1),
+              nrow = 2, byrow = TRUE)
+
+print("rho: ")
+print(rho)
+```
+
+2. (a) Given the graphs shown in F1 and F2, the expected effect pattern for both cases are
+
+```{r F for both cases}
+FList <- list()
+
+FList[["K1"]] <- matrix(c(1,0,1,0,
+                          1,1,1,1), nrow = 2, byrow = TRUE)
+FList[["K2"]] <- matrix(c(0,1,1,1,
+                          1,1,1,1), nrow = 2, byrow = TRUE)
+
+FList
+```
+
+2 (b) Given c1 and c2 are from F1, and c3 and c4 are from F2. The final R matrix is 
+
+```{r}
+RMat <- as.matrix(cbind(FList$K1[,c(1,2)],
+                        FList$K2[,c(3,4)]))
+RMat[RMat == 0 ] <- -1 
+RMat
+```
+
+
+3 Calculating the EM algorithm to update the weight matrix
+
+```{r calculate the loglikelihood in each case}
+logList <- list()
+logList[["K1"]] <- diag(t(FList$K1) %*% RMat)
+logList[["K2"]] <- diag(t(FList$K2) %*% RMat)
+logList
+```
+
+Then we calculate the responsibility
+```{r calculate the log-likelihood }
+pi <- c(0.44, 0.56)
+
+resp <- rbind(pi[1]*exp(logList$K1),
+              pi[2]*exp(logList$K2)) %>% as.data.table()
+
+resp <- resp[, lapply(.SD, function(x) x/sum(x)), .SD = colnames(resp)]
+resp
+```
+Based on the responsibility, we update the weight as 
+```{r update weight}
+(newWeight <- rowSums(resp)/sum(resp))
+```

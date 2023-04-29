@@ -4,3 +4,80 @@ output: pdf_document
 date: "2023-04-08"
 author: Hui Jeong (HJ) Jung, Gudmundur Björgvin Magnusson, Jieran Sun
 ---
+
+
+# Question 19 
+
+```{r setup, include=FALSE}
+library(data.table)
+```
+
+## (a) Store clique potentials in an R object
+
+```{r setting up the conditional probability}
+margProb <- list()
+margProb[[1]] <- c(2/3, 1/3)
+
+cliPotAry <- list()
+cliPotAry[["Psi12"]] <- rbind(c(1/5, 4/5), c(1/3, 2/3))
+cliPotAry[["Psi23"]] <- rbind(c(2/7, 5/7), c(2/3, 1/3))
+cliPotAry[["Psi34"]] <- rbind(c(2/5, 3/5), c(3/5, 2/5))
+cliPotAry[["Psi45"]] <- rbind(c(1/2, 1/2), c(2/9, 7/9))
+
+for (ind in seq_along(cliPotAry)) {
+  cliPotAry[[ind]]  <- cliPotAry[[ind]]*margProb[[ind]]
+  argProb[[ind+1]] <- colSums(cliPotAry[[ind]])
+}
+```
+
+And the R object for storing all the clique information is 
+```{r, echo=FALSE}
+print(cliPotAry)
+```
+
+## (b) Computing forward messages
+
+```{r calculating the forward messsages}
+forwardMsg <- list()
+forwardMsg[[1]] <- c(1,1)
+
+for (ind in seq_along(cliPotAry)) {
+  forwardMsg[[ind+1]] <- colSums(cliPotAry[[ind]]*forwardMsg[[ind]])
+}
+```
+
+And the forward message for each x is
+```{r, echo=FALSE}
+print(forwardMsg)
+```
+
+## (b) Computing backward messages
+
+```{r calculating the forward messsages}
+backwardMsg <- forwardMsg
+backwardMsg[[5]] <- c(1,1)
+
+for (ind in rev(seq_along(cliPotAry))) {
+  backwardMsg[[ind]] <- backwardMsg[[ind+1]] %*% t(cliPotAry[[ind]])
+}
+```
+
+And the backward message for each x is
+```{r, echo=FALSE}
+print(backwardMsg)
+```
+
+## (c) Computing all marginal probability and the normalization factor Z 
+
+```{r calculate the normalization factor Z}
+
+
+```
+
+```{r calculate the marginal distributino for x}
+
+```
+
+
+
+
